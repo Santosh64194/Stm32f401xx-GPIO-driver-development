@@ -10,6 +10,11 @@
 
 #include "stdint.h" 		//This lib is necessary when you use datatypes like uint32_t etc
 
+#define ENABLE 							1
+#define DISABLE							0
+#define SET 							ENABLE
+#define RESET 							DISABLE
+
 /*-----------------------------------------------------------------------------------------------------------------------*/
 /*
  * The following macros contains the base address of the each memory
@@ -234,6 +239,17 @@ typedef struct
 /*
  * System config controller clock disable
  */
+
+/*
+ * Peripheral reset macros
+ */
+
+#define GPIOA_REG_RESET()					do{ (RCC -> AHB1RSTR |= (1 << 0)); (RCC -> AHB1RSTR &= ~(1 << 0)); }while(0)
+#define GPIOB_REG_RESET()					do{ (RCC -> AHB1RSTR |= (1 << 1)); (RCC -> AHB1RSTR &= ~(1 << 1)); }while(0)
+#define GPIOC_REG_RESET()					do{ (RCC -> AHB1RSTR |= (1 << 2)); (RCC -> AHB1RSTR &= ~(1 << 2)); }while(0)
+#define GPIOD_REG_RESET()					do{ (RCC -> AHB1RSTR |= (1 << 3)); (RCC -> AHB1RSTR &= ~(1 << 3)); }while(0)
+#define GPIOE_REG_RESET()					do{ (RCC -> AHB1RSTR |= (1 << 4)); (RCC -> AHB1RSTR &= ~(1 << 4)); }while(0)
+#define GPIOH_REG_RESET()					do{ (RCC -> AHB1RSTR |= (1 << 7)); (RCC -> AHB1RSTR &= ~(1 << 7)); }while(0)
 
 #define SYSCFG_CLK_DIS()					( RCC -> APB2ENR &= ~(1 << 14))
 #endif /* STM32F401XX_H_ */
