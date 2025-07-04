@@ -107,6 +107,7 @@ void GPIO_Init(GPIO_Handle_t *pGPIOHandle)
 	else
 	{
 		//this is the block for interrupt mode which will be implemented later
+		//lets add the interrupt block here
 	}
 
 	temp = 0;
