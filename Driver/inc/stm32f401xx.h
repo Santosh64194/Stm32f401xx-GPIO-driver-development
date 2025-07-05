@@ -15,6 +15,38 @@
 #define SET 							ENABLE
 #define RESET 							DISABLE
 
+/********************************************Processor specific macros ***************************************************/
+
+/*
+ * The following macros defines the processor specific macros
+ * These macros are used to define the NVIC interrupt set registers to there base address
+ * The NVIC is used to handle the interrupts in the microcontroller
+ * Look the register base address and information in the cortex-m4 devices generic user guide - "https://documentation-service.arm.com/static/5f2ac76d60a93e65927bbdc5?token"
+ * Use the link to download the user guide
+ */
+
+#define NVIC_ISER0						( ( volatile uint32_t* ) 0xE000E100 )
+#define NVIC_ISER1						( ( volatile uint32_t* ) 0xE000E104 )
+#define NVIC_ISER2						( ( volatile uint32_t* ) 0xE000E108 )
+#define NVIC_ISER3						( ( volatile uint32_t* ) 0xE000E10C )
+
+/*
+ * The following macros defines NVIC interrupt clear registers to there base address
+ */
+
+#define NVIC_ICER0						( ( volatile uint32_t* ) 0xE000E180 )
+#define NVIC_ICER1						( ( volatile uint32_t* ) 0xE000E184 )
+#define NVIC_ICER2						( ( volatile uint32_t* ) 0xE000E188 )
+#define NVIC_ICER3						( ( volatile uint32_t* ) 0xE000E18C )
+
+/*
+ * The following macros defines the NVIC priority registers to there base address
+ */
+
+#define NVIC_IPR_BASEADDR				( ( volatile uint32_t* ) 0xE000E400 )
+
+#define NO_PR_BITS_IMPLEMENTED			4 // This is the number of bits implemented in the priority register and this highly manufacturer specific
+
 /*-----------------------------------------------------------------------------------------------------------------------*/
 /*
  * The following macros contains the base address of the each memory
@@ -45,7 +77,7 @@
 #define AHB1_BASEADDR					0x40020000U
 #define AHB2_BASEADDR					0x50000000U
 #define APB1_BASEADDR					0x40000000U
-#define APB2_BASEADDR					0x40011000U
+#define APB2_BASEADDR					0x40010000U
 
 /*------------------------------------------------Peripheral macro definition----------------------------------------------------*/
 
@@ -78,6 +110,10 @@
 #define USART1_BASEADDR					( APB2_BASEADDR + 0x00001000U )
 #define USART2_BASEADDR					( APB1_BASEADDR + 0x00004400U )
 #define USART6_BASEADDR 				( APB2_BASEADDR + 0x00001400U )
+
+#define EXTI_BASEADDR 					( APB2_BASEADDR + 0x00003C00U )
+
+#define SYSCFG_BASEADDR 				( APB2_BASEADDR + 0x00003800U )
 
 
 /*------------------------------------------------GPIO REGISTER DEFINITION-----------------------------------------------------------*/
@@ -133,7 +169,7 @@ typedef struct
 	volatile uint32_t APB1LPENR;      	// 0x60: APB1 peripheral clock enable in low power mode register
 	volatile uint32_t APB2LPENR;      	// 0x64: APB2 peripheral clock enable in low power mode register
 	uint32_t Reserved11;              	// 0x68: Reserved
-	uint32_t Reserved12;             	 // 0x6C: Reserved
+	uint32_t Reserved12;             	// 0x6C: Reserved
 	volatile uint32_t BDCR;           	// 0x70: Backup domain control register
 	volatile uint32_t CSR;            	// 0x74: Clock control & status register
 	uint32_t Reserved13;              	// 0x78: Reserved
@@ -144,9 +180,34 @@ typedef struct
 	volatile uint32_t DCKCFGR;        	// 0x8c: Dedicated clocks configuration register
 } RCC_RegDef_t;
 
+typedef struct
+{
+	volatile uint32_t IMR;				// 0x00: Interrupt mask register
+	volatile uint32_t EMR;				// 0x04: Event mask register
+	volatile uint32_t RTSR;				// 0x08: Rising trigger selection register
+	volatile uint32_t FTSR;				// 0x0C: Falling trigger selection register
+	volatile uint32_t SWIER;			// 0x10: Software interrupt event register
+	volatile uint32_t PR;				// 0x14: Pending register
+} EXTI_RegDef_t;
+
+
+typedef struct
+{
+	volatile uint32_t MEMRMP;			// 0x00: Memory remap register
+	volatile uint32_t PMC;				// 0x04: Peripheral mode configuration register
+	volatile uint32_t EXTICR[4];		// 0x08: External interrupt configuration registers
+	uint32_t Reserved[2];				// 0x18,0x1C: Reserved
+	volatile uint32_t CMPCR;			// 0x20: Compensation cell control register
+}SYSCFG_RegDef_t;
 
 /*
- * Another peripheral definition that is typecasted the struct in order to use them to point their registers
+ * Now we pass the base address of the SYSCFG peripheral to a pointer of type SYSCFG_RegDef_t
+ */
+
+#define SYSCFG 							( ( SYSCFG_RegDef_t* ) SYSCFG_BASEADDR )
+
+/*
+ * Another peripheral definition that is type casted the struct in order to use them to point their registers
  */
 
 #define GPIOA 							( ( GPIO_RegDef_t* ) GPIOA_BASEADDR )
@@ -157,6 +218,12 @@ typedef struct
 #define GPIOH 							( ( GPIO_RegDef_t* ) GPIOH_BASEADDR )
 
 #define RCC 							( ( RCC_RegDef_t* ) RCC_BASEADDR )
+
+/*
+ * Now we pass the base address of the EXTI peripheral to a pointer of type EXTI_RegDef_t
+ */
+
+#define EXTI 							( ( EXTI_RegDef_t* ) EXTI_BASEADDR )
 
 /*
  * GPIOx Peripheral clock enable macros
@@ -252,4 +319,15 @@ typedef struct
 #define GPIOH_REG_RESET()					do{ (RCC -> AHB1RSTR |= (1 << 7)); (RCC -> AHB1RSTR &= ~(1 << 7)); }while(0)
 
 #define SYSCFG_CLK_DIS()					( RCC -> APB2ENR &= ~(1 << 14))
+
+/*
+ * Defining the macro GPIO_BASEADDR_TO_CODE
+ */
+
+#define GPIO_BASEADDR_TO_CODE(x)			  ( (x == GPIOA) ? 0 : \
+												(x == GPIOB) ? 1 : \
+												(x == GPIOC) ? 2 : \
+												(x == GPIOD) ? 3 : \
+												(x == GPIOE) ? 4 : \
+												(x == GPIOH) ? 7 : 0 )
 #endif /* STM32F401XX_H_ */

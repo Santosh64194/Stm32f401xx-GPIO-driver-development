@@ -106,8 +106,40 @@ void GPIO_Init(GPIO_Handle_t *pGPIOHandle)
 	}
 	else
 	{
-		//this is the block for interrupt mode which will be implemented later
-		//lets add the interrupt block here
+		/*
+		 * Things that need to be done when the pin is in interrupt mode
+		 * 		1. Configure the GPIO pin to be in the input mode
+		 * 		2. Configure the edge trigger (RT,FT,RFT) for the interrupt (Cab be done in the EXTI register)
+		 * 		3. Enable the interrupt delivery from the peripheral to the processor (on the peripheral side)(done by
+		 * 		   mask register of the EXTI)
+		 * 		4. Identify the IRQ number on which the processor will be notified about the interrupt (refer the vector table)
+		 * 		5. Configure the priority of the interrupt IRQ
+		 * 		6. Enable interrupt reception on that IRQ number (in the NVIC)
+		 * 		7. Implement the IRQ handler function in the application code
+		 */
+		if (pGPIOHandle->GPIO_PinConfig.GPIO_PinMode <= GPIO_MODE_IT_FT)
+		{
+			EXTI->FTSR |= (1 << pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber); 	// Configure the falling edge trigger
+			EXTI->RTSR &= ~(1 << pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber); 	// Disable the rising edge trigger
+		}
+		else if (pGPIOHandle->GPIO_PinConfig.GPIO_PinMode <= GPIO_MODE_IT_RT)
+		{
+			EXTI->RTSR |= (1 << pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber); 	// Configure the rising edge trigger
+			EXTI->FTSR &= ~(1 << pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber); 	// Disable the falling edge trigger
+		}
+		else if (pGPIOHandle->GPIO_PinConfig.GPIO_PinMode <= GPIO_MODE_IT_RFT)
+		{
+			EXTI->RTSR |= (1 << pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber); 	// Configure the rising edge trigger
+			EXTI->FTSR |= (1 << pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber); 	// Configure the falling edge trigger
+		}
+
+		uint8_t temp1 = pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber / 4; 		// Determine which EXTI configuration register to use (0, 1, 2, or 3)
+		uint8_t temp2 = pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber % 4; 		// Determine the pin number within the EXTI configuration register
+		uint32_t portcode = GPIO_BASEADDR_TO_CODE(pGPIOHandle->pGPIOx); 		// Get the port code (0 for A, 1 for B, etc.)
+		SYSCFG_CLK_EN(); 														// Enable the clock for the SYSCFG peripheral
+		SYSCFG -> EXTICR[temp1] = portcode << (4 * temp2); 						// Configure the EXTI configuration register for the pin
+
+		EXTI->IMR |= (1 << pGPIOHandle->GPIO_PinConfig.GPIO_PinNumber); 		// Enable the interrupt mask for the pin
 	}
 
 	temp = 0;
@@ -317,7 +349,42 @@ void GPIO_ToggleOutputPin(GPIO_RegDef_t *pGPIOx, uint8_t PinNumber)
  */
 void IRQ_Config(uint8_t IRQNumber, uint8_t IRQPRIORITY, uint8_t EnorDi)
 {
+	if(EnorDi == ENABLE)
+	{
+		if(IRQNumber < 32)
+		{
+			// Enable the interrupt in the NVIC ISER register
+			*NVIC_ISER0 |= (1 << IRQNumber);
+		}
+		else if(IRQNumber > 31 && IRQNumber < 64)
+		{
+			*NVIC_ISER1 |= (1 << (IRQNumber % 32));
+		}
+		else if(IRQNumber > 63 && IRQNumber < 96)
+		{
+			*NVIC_ISER2 |= (1 << (IRQNumber % 64));
+		}
+	}
+	else
+	{
+		if(IRQNumber < 32)
+		{
+			*NVIC_ICER0 |= (1 << IRQNumber); // Disable the interrupt in the NVIC ICER register
+		}
+		else if(IRQNumber > 31 && IRQNumber < 64)
+		{
+			*NVIC_ICER1 |= (1 << (IRQNumber % 32));
+		}
+		else if(IRQNumber > 63 && IRQNumber < 96)
+		{
+			*NVIC_ICER2 |= (1 << (IRQNumber % 64));
+		}
+	}
+	uint8_t iprx = IRQNumber / 4; // Determine the interrupt priority register index
+	uint8_t iprx_section = IRQNumber % 4; // Determine the section within the interrupt priority register
 
+	uint8_t shiftamount = (8 * iprx_section) + (8 - NO_PR_BITS_IMPLEMENTED ); // Calculate the shift amount for the priority
+	*(NVIC_IPR_BASEADDR + (iprx * 4)) |= (IRQPRIORITY << shiftamount ); // Set the priority of the interrupt
 }
 
 /*******************************************************************************************************
@@ -334,7 +401,13 @@ void IRQ_Config(uint8_t IRQNumber, uint8_t IRQPRIORITY, uint8_t EnorDi)
 
 void IRQ_Handling(uint8_t PinNumber)
 {
+	if (EXTI->PR & (1 << PinNumber))			 // Check if the pending bit for the pin is set
+	{
+		printf("Inside ISR Handler \n") ;
+		printf("Pin No: %d \n " , PinNumber) ;
 
+		EXTI->PR |= (1 << PinNumber) ;			// Clear the pending bit for the pin
+	}
 }
 
 
